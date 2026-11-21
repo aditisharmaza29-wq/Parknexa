@@ -9,6 +9,9 @@
 #include <QTabWidget>
 #include <QFrame>
 #include <QSpacerItem>
+#include <QMessageBox>
+#include <QCoreApplication>
+#include <cstdlib>
 
 LoginWindow::LoginWindow(AppContext* ctx, QWidget* parent)
     : QWidget(parent), m_ctx(ctx)
@@ -179,13 +182,28 @@ void LoginWindow::onLoginClicked() {
     std::string err;
     Account* acc = m_ctx->auth.login(userId.toStdString(), pass.toStdString(), err);
     if (!acc) {
-        m_loginError->setText(QString::fromStdString(err));
-        m_loginError->show();
+        m_failedAttempts++;
+        int remaining = 3 - m_failedAttempts;
         m_loginPass->clear();
+
+        if (m_failedAttempts >= 3) {
+            m_loginError->setText("Too many failed login attempts (3). Terminating application...");
+            m_loginError->show();
+            QMessageBox::critical(this, "Access Denied",
+                "You have entered incorrect login information 3 times.\nThe application will now terminate.");
+            QCoreApplication::quit();
+            std::exit(0);
+            return;
+        }
+
+        m_loginError->setText(QString("Invalid user ID or password. (%1 attempt%2 left)")
+            .arg(remaining)
+            .arg(remaining == 1 ? "" : "s"));
+        m_loginError->show();
         return;
     }
 
-    m_ctx->currentUser = *acc;
+    m_failedAttempts = 0;
     m_ctx->isLoggedIn  = true;
     m_loginUser->clear();
     m_loginPass->clear();
